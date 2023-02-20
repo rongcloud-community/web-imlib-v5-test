@@ -12,7 +12,7 @@
     navi: '导航地址. 注: 国内数据中心可不填',
     customCMP: '链接地址(开发者忽略此项)',
     isPolling: '若使用长轮训链接方式, 可选择此项(开发者可忽略)',
-    channelId: '对方的channelId'
+    channelId: '对方的channelId',
   }
 
   components.login = Vue.component('login', {

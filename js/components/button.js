@@ -121,6 +121,7 @@
           }
         }).catch(function (errorInfo) {
           // TODO 报警
+          console.error(errorInfo)
           // error = utils.isNumber(error) ? error : error.toString();
           var data = addOutput(errorInfo, false)
           return {

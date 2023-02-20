@@ -43,7 +43,7 @@
    * @param {Object} watcher.status 监听链接状态的变化
    * @param {Object} watcher.message 监听消息的接收
    */
-  function init(config, watcher) {
+  async function init(config, watcher) {
     watcher = watcher || {}
     config = utils.clearUndefKey(config)
     config = utils.copy(config)
@@ -61,19 +61,37 @@
       }
       config.navigators = navigators
     }
-    config.logLevel = 0
+    config.logLevel = 0;
+    config.logOutputLevel = 4;
+    config.httpInMainProcess = true;
     // config.logStdout = (logLevel, content) => {
     //   console.log(`${logLevel} | ${content}`)
     // }
     // config.customCMP = ['120.92.13.84:80']
     // config.isDebug = true;
     RongIM.config.im = config
+    config.checkCA = false
+
     RongIMLib.init(config)
+
+    RongIMLib.installPlugin({
+      tag: 'apm-test',
+      verify: () => true,
+      async setup(context) {
+        const osInfo = await context.getOSInfo();
+        console.warn('osInfo ->', osInfo);
+        const processInfo = await context.getProcessInfo();
+        console.warn('processInfo ->', processInfo);
+        const mainProcessInfo = await context.getMainProcessInfo();
+        console.warn('mainProcessInfo ->', mainProcessInfo);
+      },
+    })
+
     const Events = RongIMLib.Events
     RongIMLib.addEventListener(Events.CONVERSATION, function (event) {
       console.log('watch conversation', event)
       const updateConvers = event.conversationList.map(item => {
-        return item.conversation
+          return item.conversation
       })
       watcher.conversation(updateConvers)
     })
@@ -147,15 +165,39 @@
       console.warn('recall ultra group message', list)
       watcher.ultraGroupMessageRecalled(list)
     })
+    RongIMLib.addEventListener(Events.ULTRA_GROUP_CHANNEL_TYPE_CHANGE, function (status) {
+      console.warn('ultra group channelType change', status)
+      watcher.ultraGroupChannelTypeChange(status)
+    })
+    RongIMLib.addEventListener(Events.ULTRA_GROUP_CHANNEL_USER_KICKED, function (status) {
+      console.warn('ultra group private channel user kicked', status)
+      watcher.ultraGroupChannelUserKicked(status)
+    })
+    RongIMLib.addEventListener(Events.ULTRA_GROUP_CHANNEL_DELETE, function (status) {
+      console.warn('ultra group channel delete', status)
+      watcher.ultraGroupChannelDelete(status)
+    })
     RongIMLib.addEventListener(Events.OPERATE_STATUS, function (status) {
       console.warn('ultra group typing status', status)
       watcher.operateStatus(status)
+    })
+    RongIMLib.addEventListener(Events.PRIVATE_MESSAGE_DELIVERED, function (status) {
+      console.warn('private message delivered', status)
+      watcher.privateMessageDelivered(status)
+    })
+    RongIMLib.addEventListener(Events.GROUP_MESSAGE_DELIVERED, function (status) {
+      console.warn('group message delivered', status)
+      watcher.groupMessageDelivered(status)
     })
     if (!config.customCMP) {
       delete config.customCMP
     }
 
     return RongIMLib.connect(config.token)
+  }
+
+  function destroy() {
+    return RongIMLib.destroy?.();
   }
 
   /**
@@ -167,19 +209,21 @@
   }
 
   function getConnectionStatus() {
-    return Promise.resolve(RongIMLib.getConnectionStatus())
+    return Promise.resolve({code: 0, data: RongIMLib.getConnectionStatus()})
   }
 
   function getServerTime() {
-    return Promise.resolve(RongIMLib.getServerTime())
+    return Promise.resolve({code: 0, data: RongIMLib.getServerTime()})
   }
 
   /**
    * 重新链接
    * 文档: https://docs.rongcloud.cn/im/imlib/web/connect/#reconnect
    */
-  function reconnect() {
-    return RongIMLib.connect(RongIM.config.im.token)
+  function reconnect(token = '') {
+    token = token || RongIM.config.im.token
+    token = token === '自定义token' ? RongIM.config.im.token : token
+    return RongIMLib.connect(token)
   }
 
   /**
@@ -328,6 +372,18 @@
     return RongIMLib.getTotalUnreadCount(isIncludeMute)
   }
 
+  async function getTotalUnreadCountByLevels(conversationTypes, levels) {
+    const _conversationTypes = JSON.parse(conversationTypes)
+    const _levels = JSON.parse(levels)
+    return RongIMLib.getTotalUnreadCountByLevels(_conversationTypes, _levels)
+  }
+ 
+  async function getTotalUnreadMentionedCountByLevels(conversationTypes, levels) {
+    const _conversationTypes = JSON.parse(conversationTypes)
+    const _levels = JSON.parse(levels)
+    return RongIMLib.getTotalUnreadMentionedCountByLevels(_conversationTypes, _levels)
+  }
+
   /**
    * 清除指定会话未读数
    * 文档: https://docs.rongcloud.cn/im/imlib/web/conversation/unreadcount/#clear
@@ -354,14 +410,28 @@
     let targetTypes = conversationTypes.split(',')
     targetTypes = targetTypes.map(type => Number(type))
 
-    return RongIMLib.getTotalUnreadCount(true, targetTypes).then(({ code, data }) => {
-      return { code, data }
+    return RongIMLib.getTotalUnreadCount(true, targetTypes).then(({code, data}) => {
+      return {code, data}
     })
   }
 
-  function getAllConversationState() {
-    return RongIMLib.getAllConversationState()
-  }
+  // function clearTotalUnreadCount() {
+  //   return RongIMLib.getConversationList({count: 1000}).then(({code, data}) => {
+  //     const all = [];
+  //     data && data.forEach(conver => {
+  //       if (conver.conversationType && conver.targetId) {
+  //         all.push(RongIMLib.clearMessagesUnreadStatus({
+  //           conversationType: conver.conversationType,
+  //           targetId: conver.targetId,
+  //           channelId: conver.channelId
+  //         }))
+  //       }
+  //     })
+  //     return Promise.all(all)
+  //   }).then(res => {
+  //     return Promise.resolve({code: 0, data: res})
+  //   })
+  // }
 
   /**
    * 设置会话草稿
@@ -449,7 +519,11 @@
           }
         },
         templateId: args[16]
-      }
+      },
+      onSendBefore: (msg) => {
+        console.log('onSendBefore', msg)
+      },
+      messageId: args[17]
     }
     if (userIds) {
       options.userIds = userIds
@@ -477,7 +551,7 @@
    * @param {string} base64 图片 base64 缩略图
    * @param {string} imageUri 图片上传后的 url
    */
-  function sendImageMessage(base64, imageUri, conversationType, targetId, channelId, disableNotification) {
+  function sendImageMessage(base64, imageUri, conversationType, targetId, channelId, disableNotification, messageId) {
     var content = {
       content: base64, // 压缩后的 base64 略缩图, 用来快速展示图片
       imageUri: imageUri // 上传到服务器的 url. 用来展示高清图片
@@ -488,7 +562,8 @@
       targetId,
       channelId
     }, message, {
-      disableNotification
+      disableNotification,
+      messageId
     })
   }
 
@@ -503,7 +578,7 @@
    * @param {string} height 图片上传后的 url
    * @param {string} extra 图片上传后的 url
    */
-  function sendGIFMessage(conversationType, targetId, channelId, gifDataSize, remoteUrl, width, height, extra) {
+  function sendGIFMessage(conversationType, targetId, channelId, gifDataSize, remoteUrl, width, height, extra, messageId) {
     // var content = {
     //   gifDataSize,
     //   remoteUrl,
@@ -524,7 +599,7 @@
       conversationType,
       targetId,
       channelId
-    }, message)
+    }, message, {messageId})
   }
 
   /**
@@ -536,7 +611,7 @@
    * @param {string} fileType 文件类型
    * @param {string} fileUrl 文件上传后的 url
    */
-  function sendFileMessage(fileName, fileSize, fileType, fileUrl, conversationType, targetId, channelId, disableNotification) {
+  function sendFileMessage(fileName, fileSize, fileType, fileUrl, conversationType, targetId, channelId, disableNotification, messageId) {
     var content = {
       name: fileName, // 文件名
       size: fileSize, // 文件大小
@@ -551,7 +626,8 @@
       targetId,
       channelId
     }, message, {
-      disableNotification
+      disableNotification,
+      messageId
     })
   }
 
@@ -563,7 +639,7 @@
    * @param {string} remoteUrl 语音上传后的 url
    * @param {number} duration 语音时长
    */
-  function sendVoiceMessage(remoteUrl, type, duration, conversationType, targetId, channelId, disableNotification) {
+  function sendVoiceMessage(remoteUrl, type, duration, conversationType, targetId, channelId, disableNotification, messageId) {
     // var content = {
     //   remoteUrl: remoteUrl, // 音频 url, 建议格式: aac
     //   duration: duration, // 音频时长
@@ -580,7 +656,8 @@
       targetId,
       channelId
     }, message, {
-      disableNotification
+      disableNotification,
+      messageId
     })
   }
 
@@ -598,20 +675,172 @@
     if (!messageUId || !sentTime) {
       return utils.Defer.reject('请先发送消息, 再进行撤回操作');
     }
-    var recallMessage = {
-      messageUId: messageUId,
-      sentTime: sentTime,
-      senderUserId: selfUserId,
-      conversationType,
-      targetId: targetId,
-      content: {
-        content: '消息内容',
-        extra: '额外信息'
-      }
-    };
 
     var option = {
       disableNotification,
+      messageUId: messageUId,
+      sentTime: sentTime,
+      pushConfig: {
+        pushTitle: args[0],
+        pushContent: args[1],
+        pushData: args[2],
+        disablePushTitle: args[3],
+        forceShowDetailContent: args[4],
+        iOSConfig: {
+          threadId: args[5],
+          apnsCollapseId: args[6],
+          category: args[7],
+          richMediaUri: args[8]
+        },
+        androidConfig: {
+          notificationId: args[9],
+          channelIdMi: args[10],
+          channelIdHW: args[11],
+          channelIdOPPO: args[12],
+          typeVivo: args[13],
+          googleConfig: {
+            collapseKey: args[14],
+            imageUrl: args[15],
+          }
+        },
+        templateId: args[16]
+      },
+      user: args[17] ? JSON.parse(args[17]) : undefined,
+      extra: args[18],
+      isDelete: args[19]
+    }
+
+    return RongIMLib.recallMessage({
+      conversationType,
+      targetId: targetId,
+      channelId
+    }, option)
+  }
+
+  /**
+   * 发送 @ 消息(此处以文本消息举例)
+   * 文档: https://docs.rongcloud.cn/im/imlib/web/message-send/#example
+   *
+   * @param {string} text 文字内容
+   * @param {string} methiondId @ 对象的 id
+   */
+  function sendAtMessage(text, methiondId, conversationType, targetId, disableNotification, channelId, mentionedType, mentionedContent, messageId) {
+    conversationType = Number(conversationType)
+
+    if (![1,2].includes(mentionedType)) {
+      return Promise.reject('The value of mentionedType must be 1 or 2')
+    }
+
+    var isMentioned = true
+
+    var content = {
+      content: text,
+      mentionedInfo: {
+        type: mentionedType,
+        userIdList: [methiondId],
+        mentionedContent
+      }
+    }
+
+    const message = new RongIMLib.TextMessage(content)
+
+    return RongIMLib.sendMessage({
+      conversationType,
+      targetId: targetId,
+      channelId
+    }, message, {
+      isMentioned: isMentioned,
+      disableNotification,
+      messageId
+    });
+  }
+
+  // 测试错误参数下发送 @  消息
+  function sendAtMessageByErrorParamField(text, methiondId, conversationType, targetId, disableNotification) {
+    conversationType = Number(conversationType)
+
+    var isMentioned = true
+
+    var content = {
+      content: text
+    }
+    const message = new RongIMLib.TextMessage(content)
+
+    return RongIMLib.sendMessage({
+      conversationType,
+      targetId: targetId
+    }, message, {
+      isMentiond: isMentioned,
+      mentiondUserIdList: [methiondId], // @ 人 id 列表
+      mentiondType: 1,
+      disableNotification
+    });
+  }
+
+  // 发送输入中消息
+  function sendTypingStatusMessage(conversationType, targetId, channelId, messageType) {
+    return RongIMLib.sendTypingStatusMessage({
+      conversationType,
+      targetId,
+      channelId
+    }, messageType)
+  }
+
+  /**
+   * 注册自定义消息
+   * 文档: https://docs.rongcloud.cn/im/imlib/web/message-send/#custom
+   *
+   * @param {string} messageName 注册消息的 Web 端类型名
+   * @param {string} messageType 注册消息的唯一名称. 注: 此名称需多端一致
+   * @param {boolean} isCounted 是否计数
+   * @param {boolean} isPersited 是否存储
+   * @param {Array<string>} props 消息包含的字段集合
+   */
+  function registerMessage(messageType, isPersited, isCounted, props) {
+    // var mesasgeTag = new RongIMLib.MessageTag(isCounted, isPersited); //true true 保存且计数，false false 不保存不计数。
+    // props = props.split(','); // 将字符串截取为数组. 此处为 Demo 逻辑, 与融云无关
+    // RongIMClient.registerMessageType(messageName, messageType, mesasgeTag, props);
+    // 废弃此概念
+
+    props = props.split(','); // 将字符串截取为数组. 此处为 Demo 逻辑, 与融云无关
+    RongIMLib.registerMessageType(messageType, isPersited, isCounted, props)
+    return utils.Defer.resolve()
+  }
+
+  /**
+   * 发送自定义消息
+   * 文档: https://docs.rongcloud.cn/im/imlib/web/message-send/#custom
+   *
+   * @param {string} messageType 注册消息的 Web 端类型名
+   * @param {*} props 消息包含的字段集合
+   */
+  function sendRegisterMessage(messageType, props, conversationType, targetId, channelId, disableNotification, canIncludeExpansion, key, val, userIds, ...args) {
+    var content = {}
+    props && (props = props.split(','))
+    props.forEach(item => {
+      content[item] = item
+    })
+
+    let expansion = {};
+    !utils.isEmpty(key) && (key = key.split(','));
+    !utils.isEmpty(val) && (val = val.split(','));
+    !utils.isEmpty(key) && key.forEach((item, idx) => {
+      expansion[item] = val[idx];
+    })
+    expansion = expansion || { key: 'value' }
+
+    const message = new RongIMLib.BaseMessage(
+      messageType,
+      {
+        content: content
+      }
+    )
+
+    const options = {
+      // isStatusMessage: isStatusMessage,
+      disableNotification: disableNotification,
+      canIncludeExpansion,
+      expansion,
       pushConfig: {
         pushTitle: args[0],
         pushContent: args[1],
@@ -639,122 +868,11 @@
       }
     }
 
-    return RongIMLib.recallMessage({
-      conversationType,
-      targetId: targetId,
-      channelId
-    }, recallMessage, option)
-  }
-
-  /**
-   * 发送 @ 消息(此处以文本消息举例)
-   * 文档: https://docs.rongcloud.cn/im/imlib/web/message-send/#example
-   *
-   * @param {string} text 文字内容
-   * @param {string} methiondId @ 对象的 id
-   */
-  function sendAtMessage(text, methiondId, conversationType, targetId, disableNotification, channelId, mentionedType, mentionedContent) {
-    conversationType = Number(conversationType)
-
-    if (![1, 2].includes(mentionedType)) {
-      return Promise.reject('The value of mentionedType must be 1 or 2')
-    }
-
-    var isMentioned = true
-
-    var content = {
-      content: text,
-      mentionedInfo: {
-        type: mentionedType,
-        userIdList: [methiondId],
-        mentionedContent
-      }
-    }
-
-    const message = new RongIMLib.TextMessage(content)
-
     return RongIMLib.sendMessage({
       conversationType,
       targetId: targetId,
       channelId
-    }, message, {
-      isMentioned: isMentioned,
-      disableNotification
-    });
-  }
-
-  // 测试错误参数下发送 @  消息
-  function sendAtMessageByErrorParamField(text, methiondId, conversationType, targetId, disableNotification) {
-    conversationType = Number(conversationType)
-
-    var isMentioned = true
-
-    var content = {
-      content: text
-    }
-    const message = new RongIMLib.TextMessage(content)
-
-    return RongIMLib.sendMessage({
-      conversationType,
-      targetId: targetId
-    }, message, {
-      isMentiond: isMentioned,
-      mentiondUserIdList: [methiondId], // @ 人 id 列表
-      mentiondType: 1,
-      disableNotification
-    });
-  }
-
-  const customMessageTypes = {}
-  /**
-   * 注册自定义消息
-   * 文档: https://docs.rongcloud.cn/im/imlib/web/message-send/#custom
-   *
-   * @param {string} messageName 注册消息的 Web 端类型名
-   * @param {string} messageType 注册消息的唯一名称. 注: 此名称需多端一致
-   * @param {boolean} isCounted 是否计数
-   * @param {boolean} isPersited 是否存储
-   * @param {Array<string>} props 消息包含的字段集合
-   */
-  function registerMessage(messageType, isPersited, isCounted, props, isStatusMessage) {
-    // var mesasgeTag = new RongIMLib.MessageTag(isCounted, isPersited); //true true 保存且计数，false false 不保存不计数。
-    // props = props.split(','); // 将字符串截取为数组. 此处为 Demo 逻辑, 与融云无关
-    // RongIMClient.registerMessageType(messageName, messageType, mesasgeTag, props);
-    // 废弃此概念
-
-    customMessageTypes[messageType] = RongIMLib.registerMessageType(messageType, isPersited, isCounted, props, isStatusMessage)
-    return utils.Defer.resolve()
-  }
-
-  /**
-   * 发送自定义消息
-   * 文档: https://docs.rongcloud.cn/im/imlib/web/message-send/#custom
-   *
-   * @param {string} messageType 注册消息的 Web 端类型名
-   * @param {*} props 消息包含的字段集合
-   */
-  function sendRegisterMessage(messageType, props, conversationType, targetId, channelId, disableNotification) {
-    var content = {}
-    props && (props = props.split(','))
-    props.forEach(item => {
-      content[item] = item
-    })
-
-    const message = customMessageTypes[messageType] ? new customMessageTypes[messageType](content) :
-      new RongIMLib.BaseMessage(
-        messageType,
-        {
-          content: content
-        }
-      )
-
-    return RongIMLib.sendMessage({
-      conversationType,
-      targetId: targetId,
-      channelId
-    }, message, {
-      disableNotification
-    })
+    }, message, options)
   }
 
   /**
@@ -769,7 +887,7 @@
    * @param {number} longitude 经度
    * @param {string} poi 位置信息
    */
-  function sendLocationMessage(base64, latitude, longitude, poi, conversationType, targetId, channelId, disableNotification) {
+  function sendLocationMessage(base64, latitude, longitude, poi, conversationType, targetId, channelId, disableNotification, messageId) {
     // var content = {
     //   latitude: latitude,
     //   longitude: longitude,
@@ -788,7 +906,8 @@
       targetId: targetId,
       channelId
     }, message, {
-      disableNotification
+      disableNotification,
+      messageId
     })
   }
 
@@ -802,7 +921,7 @@
    * @param {number} objName 引用消息类型
    * @param {string} content 消息内容
    */
-  function sendReferenceMessage(referContent, referMsgUserId, objName, content, conversationType, targetId, channelId, disableNotification) {
+  function sendReferenceMessage(referContent, referMsgUserId, objName, content, conversationType, targetId, channelId, disableNotification, messageId) {
     // var content = {
     //   referMsg: {
     //     content: referContent
@@ -826,7 +945,8 @@
       targetId: targetId,
       channelId
     }, message, {
-      disableNotification
+      disableNotification,
+      messageId
     })
   }
 
@@ -839,7 +959,7 @@
    * @param {number} imageUri 显示图片的 url(图片信息)
    * @param {string} url 点击图文后打开的 url
    */
-  function sendRichContentMessage(title, content, imageUri, url, conversationType, targetId, channelId, disableNotification) {
+  function sendRichContentMessage(title, content, imageUri, url, conversationType, targetId, channelId, disableNotification, messageId) {
     // content = {
     //   title: title,
     //   content: content,
@@ -859,14 +979,15 @@
       targetId: targetId,
       channelId
     }, message, {
-      disableNotification
+      disableNotification,
+      messageId
     })
   }
 
   /**
    * 发送小视频消息
   */
-  function sendSightMessage(conversationType, targetId, channelId, sightUrl, content, duration, size, name) {
+  function sendSightMessage(conversationType, targetId, channelId, sightUrl, content, duration, size, name, messageId) {
     // content = {
     //   sightUrl: sightUrl,
     //   content: content,
@@ -885,10 +1006,10 @@
       conversationType,
       targetId: targetId,
       channelId
-    }, message)
+    }, message, {messageId})
   }
 
-  function sendImageMessageByUpload(file, conversationType, targetId, channelId, disableNotification, maxHeight, maxWidth, quality, scale) {
+  function sendImageMessageByUpload(file, conversationType, targetId, channelId, disableNotification, maxHeight, maxWidth, quality, scale, isPreview) {
     if (!file) {
       alert('需要选择一个图片');
       return Promise.reject('需要选择一个图片');
@@ -908,11 +1029,12 @@
       disableNotification,
       thumbnailConfig: {
         maxHeight, maxWidth, quality, scale
-      }
+      },
+      contentDisposition: isPreview ? 'inline' : 'attachment'
     });
   }
 
-  function sendFileMessageByUpload(file, conversationType, targetId, channelId, disableNotification) {
+  function sendFileMessageByUpload(file, conversationType, targetId, channelId, disableNotification, isPreview) {
     if (!file) {
       alert('需要选择一个文件');
       return Promise.reject('需要选择一个文件');
@@ -929,11 +1051,13 @@
         console.log(progress)
       }
     }, {
-      disableNotification
-    });
+      disableNotification,
+      contentDisposition: isPreview ? 'inline' : 'attachment'
+    }
+    );
   }
 
-  function sendHQVoiceMessageByUpload(file, conversationType, targetId, channelId, disableNotification) {
+  function sendHQVoiceMessageByUpload(file, conversationType, targetId, channelId, disableNotification, isPreview) {
     if (!file) {
       alert('需要选择一个声音文件');
       return Promise.reject('需要选择一个声音文件');
@@ -950,11 +1074,12 @@
         console.log(progress)
       }
     }, {
-      disableNotification
+      disableNotification,
+      contentDisposition: isPreview ? 'inline' : 'attachment'
     });
   }
 
-  function sendSightMessageByUpload(file, conversationType, targetId, channelId, disableNotification, thumbnail, duration, name) {
+  function sendSightMessageByUpload(file, conversationType, targetId, channelId, disableNotification, thumbnail, duration, name, isPreview) {
     if (!file) {
       alert('需要选择一个短视频');
       return Promise.reject('需要选择一个短视频文件');
@@ -974,11 +1099,12 @@
         console.log(progress)
       }
     }, {
-      disableNotification
+      disableNotification,
+      contentDisposition: isPreview ? 'inline' : 'attachment'
     });
   }
 
-  function sendCombineMessageByUpload(file, conversationType, targetId, channelId, disableNotification, nameList, summaryList, ctype) {
+  function sendCombineMessageByUpload(file, conversationType, targetId, channelId, disableNotification, nameList, summaryList, ctype, isPreview) {
     if (!file) {
       alert('需要选择一个HTML文件');
       return Promise.reject('需要选择一个HTML文件');
@@ -1000,6 +1126,8 @@
       }
     }, {
       disableNotification
+    }, {
+      isPreview
     });
   }
 
@@ -1036,9 +1164,6 @@
    * @param {string} chatRoomId 聊天室 id
    */
   function quitChatRoom(chatRoomId) {
-    RongIMLib.bindRTCRoomForChatroom({ chatRoomId, rtcRoomId: '111' }).then((res) => {
-      console.log(res)
-    })
     return RongIMLib.quitChatRoom(chatRoomId)
   }
 
@@ -1076,7 +1201,7 @@
     return RongIMLib.setChatRoomEntry(chatRoomId, entry)
   }
 
-  function setChatRoomEntries(chatRoomId, entries, isAutoDelete) {
+  function setChatRoomEntries(chatRoomId, entries, isAutoDelete, isForce) {
     try {
       entries = JSON.parse(entries)
     } catch (e) {
@@ -1085,7 +1210,8 @@
     }
     const options = {
       entries,
-      isAutoDelete
+      isAutoDelete,
+      isForce
     }
     return RongIMLib.setChatRoomEntries(chatRoomId, options)
   }
@@ -1147,6 +1273,14 @@
     }, isNotification);
   }
 
+  function setConversationNotificationLevel(isNotification, conversationType, targetId, channelId) {
+    return RongIMLib.setConversationNotificationLevel({
+      conversationType,
+      targetId,
+      channelId
+    }, isNotification);
+  }
+
   function setConversationToTop(isTop, conversationType, targetId, channelId) {
     return RongIMLib.setConversationToTop({
       conversationType,
@@ -1159,8 +1293,14 @@
     return RongIMLib.getBlockedConversationList()
   }
 
-  function getTopConversationList() {
-    return RongIMLib.getTopConversationList()
+  function getTopConversationList(types, channelId) {
+    const _types = JSON.parse(types)
+    return RongIMLib.getTopConversationList(_types, channelId)
+  }
+
+  function getUnreadConversationList(types) {
+    const _types = JSON.parse(types)
+    return RongIMLib.getUnreadConversationList(_types)
   }
 
   function setMessageKV() {
@@ -1233,15 +1373,6 @@
     return RongIMLib.sendReadReceiptMessage(targetId, messageUId, lastMessageSendTime, channelId)
   }
 
-  // 获取已读列表
-  function getMessageReader(targetId, messageUid, channelId) {
-    if (!targetId || !messageUid) {
-      alert('参数不能为空')
-      return
-    }
-    return RongIMLib.getMessageReader(targetId, messageUid, channelId)
-  }
-
   /**
    * 发送群回执请求消息
    */
@@ -1257,9 +1388,9 @@
    * 发送群回执响应消息
    */
   function sendReadReceiptResponseMessage(targetId, messageList, channelId) {
-    try {
+    try{
       messageList = JSON.parse(messageList);
-    } catch (e) {
+    } catch(e) {
       alert('messageList参数错误，应该为json')
       return
     }
@@ -1284,15 +1415,6 @@
       targetId,
       channelId
     }, lastMessageSendTime)
-  }
-
-  function sendTypingStatusMessage(conversationType, targetId, channelId, MessageType) {
-    channelId = channelId || ''
-    return RongIMLib.sendTypingStatusMessage({
-      conversationType,
-      targetId,
-      channelId
-    }, MessageType)
   }
 
   /**
@@ -1373,7 +1495,7 @@
   /**
    * 根据标签获取未读消息数
    */
-  function getUnreadCountByTag(tagId, containMuted) {
+  function getUnreadCountByTag(tagId, containMuted) { 
     return RongIMLib.getUnreadCountByTag(tagId, containMuted)
   }
 
@@ -1414,20 +1536,46 @@
   /**
    * =========== 协议栈独有接口 ============
   */
+
   /**
    * 向本地插入消息
   */
-  function insertMessage(conversationType, targetId, channelId, senderUserId, objectName, content, direction, channelId) {
+   function insertMessage(conversationType, targetId, channelId, senderUserId, objectName, content, direction, sentTime, canIncludeExpansion, key, val) {
+    let expansion = {};
+    !utils.isEmpty(key) && (key = key.split(','));
+    !utils.isEmpty(val) && (val = val.split(','));
+    !utils.isEmpty(key) && key.forEach((item, idx) => {
+      expansion[item] = val[idx];
+    })
+    expansion = expansion || { key: 'value' }
     const msg = {
       senderUserId,
       messageType: objectName,
       content: {
         content
       },
+      sentTime,
       messageDirection: direction,
-      channelId
+      channelId,
+      canIncludeExpansion,
+      expansion
     }
-    return RongIMLib.insertMessage({ conversationType, targetId, channelId }, msg)
+    return RongIMLib.electronExtension.insertMessage({conversationType, targetId, channelId}, msg)
+  }
+  /**
+   * 向本地插入BaseMessage消息
+  */
+  function insertBaseMessage(conversationType, targetId, channelId, objectName, content) {
+    const msg = new RongIMLib.BaseMessage(objectName, { content })
+    console.log('msg:', msg);
+    return RongIMLib.electronExtension.insertMessage({conversationType, targetId, channelId}, msg)
+  }
+  /**
+   * 向本地批量插入消息
+   */
+  function batchInsertMessage (messages, checkDuplicate) {
+    const msg = JSON.parse(messages)
+    return RongIMLib.electronExtension.batchInsertMessage(msg, checkDuplicate)
   }
   /**
    * 获取本地消息
@@ -1437,35 +1585,42 @@
   }
 
   /**
-   * 获取会话下所有未读的 @ 消息
+   * 获取会话所有消息数
   */
-  function getUnreadMentionedMessage(conversationType, targetId, channelId) {
+  function getMessageCount(conversationType, targetId, channelId) {
     return new Promise((resolve, reject) => {
-      const msg = RongIMLib.getUnreadMentionedMessages({ conversationType, targetId, channelId })
+      const msg = RongIMLib.electronExtension.getMessageCount({conversationType, targetId, channelId})
       resolve(msg)
     })
   }
 
   /**
-   * 按内容搜索会话内的消息
+   * 获取会话下所有未读的 @ 消息
   */
-  function searchMessageByContent(conversationType, targetId, keyword, timestamp, count, channelId) {
-    return RongIMLib.searchMessages({ conversationType, targetId, channelId }, keyword, timestamp, count, 1)
+  function getUnreadMentionedMessage(conversationType, targetId, channelId) {
+    return new Promise((resolve, reject) => {
+      const msg = RongIMLib.getUnreadMentionedMessages({conversationType, targetId, channelId})
+      resolve(msg)
+    })
   }
 
   /**
    * 通过时间戳删除删除本地消息
   */
   function deleteLocalMessagesByTimestamp(conversationType, targetId, timestamp, channelId) {
-    return RongIMLib.deleteLocalMessagesByTimestamp({ conversationType, targetId, channelId }, timestamp, false)
+    return RongIMLib.electronExtension.deleteMessagesByTimestamp({conversationType, targetId, channelId}, timestamp, false)
   }
 
   /**
    * 清空会话下本地历史消息
   */
   function clearMessages(conversationType, targetId, channelId) {
-    return RongIMLib.clearMessages({ conversationType, targetId, channelId })
+    return RongIMLib.electronExtension.clearMessages({conversationType, targetId, channelId})
 
+  }
+
+  function setCheckDuplicateMessage(enableCheck) {
+    return RongIMLib.electronExtension.setCheckDuplicateMessage(enableCheck)
   }
 
   /**
@@ -1480,21 +1635,63 @@
     if (!utils.isEmpty(customMessageTypes)) {
       msgTypes = customMessageTypes.split(',')
     }
-    return RongIMLib.searchConversationByContent(keyword, types, msgTypes, channelId)
+    return RongIMLib.electronExtension.searchConversationByContent(keyword, types, msgTypes, channelId)
   }
 
   /**
    * 删除时间戳前的未读消息数量
   */
   function clearUnreadCountByTimestamp(conversationType, targetId, timestamp, channelId) {
-    return RongIMLib.clearUnreadCountByTimestamp({ conversationType, targetId, channelId }, timestamp)
+    return RongIMLib.clearUnreadCountByTimestamp({conversationType, targetId, channelId}, timestamp)
   }
 
   /**
-   * 获取会话免打扰状态
+   * 获取会话免打扰状态（旧）
   */
   function getConversationNotificationStatus(conversationType, targetId, channelId) {
-    return RongIMLib.getConversationNotificationStatus({ conversationType, targetId, channelId })
+    return RongIMLib.getConversationNotificationStatus({conversationType, targetId, channelId})
+  }
+
+  /**
+   * 获取会话免打扰状态（新）
+  */
+  function getConversationNotificationLevel(conversationType, targetId, channelId) {
+    return RongIMLib.getConversationNotificationLevel({conversationType, targetId, channelId})
+  }
+  /**
+   * 查询指定超级群默认通知配置
+  */
+  function getUltraGroupDefaultNotificationLevel(targetId, channelId) {
+    return RongIMLib.getUltraGroupDefaultNotificationLevel({targetId, channelId})
+  }
+
+  /**
+   * 获取指定超级群所有频道未读数 
+  */
+  function getUltraGroupUnreadCountByTargetId(targetId, levels) {
+    const _levels = JSON.parse(levels)
+    return RongIMLib.getUltraGroupUnreadCountByTargetId(targetId, _levels)
+  }
+
+  /**
+   * 获取超级群类型所有消息未读数 
+  */
+   function getAllUltraGroupUnreadCount(targetId) {
+    return RongIMLib.getAllUltraGroupUnreadCount(targetId)
+  }
+
+  /**
+   * 获取超级群类型所有 @ 消息未读数 
+  */
+   function getAllUltraGroupUnreadMentionedCount(targetId) {
+    return RongIMLib.getAllUltraGroupUnreadMentionedCount(targetId)
+  }
+
+  /**
+   * 查询指定超级群默认通知配置
+  */
+  function setUltraGroupDefaultNotificationLevel(targetId, channelId, notificationLevel) {
+    return RongIMLib.setUltraGroupDefaultNotificationLevel({ targetId, channelId}, notificationLevel)
   }
 
   /**
@@ -1510,8 +1707,13 @@
   /**
    * 获取超级群会话列表
    */
-  function getUltraGroupList() {
-    return RongIMLib.getUltraGroupList()
+  function getUltraGroupList(targetId, channelType, all) {
+    console.log('targetId, channelId, all:', targetId, channelType, all)
+    if (all) {
+      return RongIMLib.getUltraGroupList()
+    } else {
+      return RongIMLib.getUltraGroupList({ targetId, channelType })
+    }
   }
   /**
    * 获取超级群免打扰会话列表
@@ -1524,89 +1726,89 @@
    * 扩展消息
    */
   function updateExpansionForUltraGroupMessage(
-    conversationType,
-    targetId,
-    channelId,
-    messageUId,
+    conversationType, 
+    targetId, 
+    channelId, 
+    messageUId, 
     sendTime,
     canIncludeExpansion,
     keys,
     values) {
-    if (!canIncludeExpansion) return Promise.resolve({msg: '消息扩展开关未开'})
-    const keyArray = keys.split(',') || []
-    const valueArray = values.split(',') || []
-    let expansion = {}
-    keyArray.forEach((item, index) => {
-      if (valueArray.length > index) {
-        expansion[item] = valueArray[index]
+      if (!canIncludeExpansion) return Promise.resolve({msg: '消息扩展开关未开'})
+      const keyArray = keys.split(',') || []
+      const valueArray = values.split(',') || []
+      let expansion = {}
+      keyArray.forEach((item, index) => {
+        if (valueArray.length > index) {
+          expansion[item] = valueArray[index]
+        }
+      })
+      
+      const msg = {
+        canIncludeExpansion,
+        channelId,
+        conversationType,
+        targetId,
+        messageUId,
+        sentTime: sendTime
       }
-    })
-
-    const msg = {
-      canIncludeExpansion,
-      channelId,
-      conversationType,
-      targetId,
-      messageUId,
-      sentTime: sendTime
-    }
-    return RongIMLib.updateExpansionForUltraGroupMessage(expansion, msg)
+      return RongIMLib.updateExpansionForUltraGroupMessage(expansion, msg)
   }
 
   /**
    * 删除消息的扩展
    */
   function removeExpansionForUltraGroupMessage(
-    conversationType,
-    targetId,
-    channelId,
-    messageUId,
+    conversationType, 
+    targetId, 
+    channelId, 
+    messageUId, 
     sendTime,
     canIncludeExpansion,
     deleteKeys) {
-    if (!canIncludeExpansion) return
-    const keyArray = deleteKeys.split(',')
-    const msg = {
-      canIncludeExpansion,
-      channelId,
-      conversationType,
-      targetId,
-      messageUId,
-      sentTime: sendTime
-    }
-    return RongIMLib.removeExpansionForUltraGroupMessage(keyArray, msg)
+      if(!canIncludeExpansion) return
+      const keyArray = deleteKeys.split(',')
+      const msg = {
+        canIncludeExpansion,
+        channelId,
+        conversationType,
+        targetId,
+        messageUId,
+        sentTime: sendTime
+      }
+      return RongIMLib.removeExpansionForUltraGroupMessage(keyArray, msg)
   }
 
   /**
    * 删除消息的所有扩展
    */
   function removeAllExpansionForUltraGroupMessage(
-    conversationType,
-    targetId,
+    conversationType, 
+    targetId, 
     channelId,
-    messageUId,
+    messageUId, 
     sendTime,
     canIncludeExpansion) {
-    if (!canIncludeExpansion) return
-    const msg = {
-      canIncludeExpansion,
-      channelId,
-      conversationType,
-      targetId,
-      messageUId,
-      sentTime: sendTime
-    }
-    return RongIMLib.removeAllExpansionForUltraGroupMessage(msg)
+      if(!canIncludeExpansion) return
+      const msg = {
+        canIncludeExpansion,
+        channelId,
+        conversationType,
+        targetId,
+        messageUId,
+        sentTime: sendTime
+      }
+      return RongIMLib.removeAllExpansionForUltraGroupMessage(msg)
   }
 
   /**
    * 根据ID删除超级群会话
    */
   function modifyMessage(
-    conversationType,
-    targetId,
+    conversationType, 
+    targetId, 
     channelId,
-    messageUId,
+    messageUId, 
     sendTime,
     content) {
     const obj = JSON.parse(content)
@@ -1624,12 +1826,12 @@
    * 正在输入中
    */
   function sendUltraGroupTypingStatus(conversationType, targetId, channelId) {
-    return RongIMLib.sendUltraGroupTypingStatus({ targetId, conversationType, channelId })
+    return RongIMLib.sendUltraGroupTypingStatus({targetId, conversationType, channelId})
   }
 
-  /**
-  * 根据ID获取消息列表
-  */
+   /**
+   * 根据ID获取消息列表
+   */
   function getUltraGroupMessageListByMessageUId(conversationType, targetId, channelId, messages) {
     const msgs = JSON.parse(messages)
     return RongIMLib.getUltraGroupMessageListByMessageUId({ conversationType, targetId, channelId }, msgs)
@@ -1638,36 +1840,174 @@
   /**
    * 获取指定超级群所有子频道的未读数
    */
-  function getUltraGroupUnreadMentionedCountByTargetId(targetId) {
-    return RongIMLib.getUltraGroupUnreadMentionedCountByTargetId(targetId)
+  function getUltraGroupUnreadMentionedCountByTargetId(targetId, levels) {
+    const _levels = JSON.parse(levels)
+    return RongIMLib.getUltraGroupUnreadMentionedCountByTargetId(targetId, _levels)
   }
 
 
   /**
    * 获取 @ 未读消息数
    */
-  function getUnreadMentionedCount(conversationType, targetId, channelId) {
+  function getUnreadMentionedCount (conversationType, targetId, channelId) {
     return RongIMLib.getUnreadMentionedCount({
       conversationType, targetId, channelId
     })
   }
 
   /**
-   * 获取所有 @ 未读消息数
-   */
-  function getAllUnreadMentionedCount() {
-    return RongIMLib.getAllUnreadMentionedCount()
+   * 获取超级群指定会话未读 @ 消息列表
+  */
+  function getUltraGroupUnreadMentionedMessages (targetId, channelId, sentTime, count) {
+    return RongIMLib.getUltraGroupUnreadMentionedMessages({ targetId, channelId, sentTime, count })
   }
 
-  function bindRTCRoomForChatroom(chatRoomId, rtcRoomId) {
-    return RongIMLib.bindRTCRoomForChatroom({
-      chatRoomId,
-      rtcRoomId,
+  /**
+   * 获取超级群指定会话第一条未读消息时间戳
+  */
+  function getUltraGroupFirstUnreadMessageTimestamp (targetId, channelId) {
+    return RongIMLib.getUltraGroupFirstUnreadMessageTimestamp({ targetId, channelId })
+  }
+
+    // ================================= electron 新增独有接口 =============
+  // 获取全部会话列表
+  function getAllConversationList (channelId) {
+    return new Promise((resolve) => {
+      RongIMLib.electronExtension.getAllConversationList(channelId).then(res => {
+        if (res.code === 0) {
+          console.log(`获取到 ${res.data.length} 条会话`);
+        }
+        resolve(res)
+      })
     })
   }
+
+  // 分页获取会话列表
+  function getConversationListPC (startTime, count, channelId) {
+    return new Promise((resolve) => {
+      RongIMLib.electronExtension.getConversationList(startTime, count, channelId).then(res => {
+        if (res.code === 0) {
+          console.log(`获取到 ${res.data.length} 条会话`);
+        }
+        resolve(res)
+      })
+    })
+  }
+
+  // 通过消息关键字搜索会话
+  function searchConversationByContent (keyword, messageTypes, channelId) {
+    return new Promise((resolve) => {
+      RongIMLib.electronExtension.searchConversationByContent(keyword, [messageTypes], channelId).then(res => {
+        if (res.code === 0) {
+          console.log(`搜索到 ${res.data.length} 条会话`);
+        }
+        resolve(res)
+      })
+    })
+  }
+
+  // 按内容搜索指定会话内的消息
+  function searchMessages (conversationType, targetId, keyword, startTime, count, channelId,) {
+    return new Promise((resolve) => {
+      RongIMLib.electronExtension.searchMessages({
+        conversationType,
+        targetId,
+        channelId
+      }, keyword, startTime, count).then(res => {
+        if (res.code === 0) {
+          console.log(`搜索到 ${res.data.length} 条消息`);
+        }
+        resolve(res)
+      })
+    })
+  }
+
+  // 按内容搜索指定会话内的消息
+  function searchMessageInTimeRange (conversationType, targetId, keyword, startTime, endTime,  offset, limit) {
+    return new Promise((resolve) => {
+      RongIMLib.electronExtension.searchMessageInTimeRange({
+        conversationType,
+        targetId
+      }, {keyword, startTime, endTime, offset, limit}).then(res => {
+        if (res.code === 0) {
+          console.log(`搜索到 ${res.data.length} 条消息`);
+        }
+        resolve(res)
+      })
+    })
+  }
+
+  // 获取指定消息类型的历史消息
+  function getHistoryMessagesByMessageTypes (conversationType, targetId, channelId, timestamp, count,  order, messageType) {
+    return new Promise((resolve) => {
+      RongIMLib.electronExtension.getHistoryMessagesByMessageTypes({
+        conversationType,
+        targetId,
+        channelId
+      }, {timestamp, count, order, messageTypes: [messageType]}).then(res => {
+        if (res.code === 0) {
+          console.log(`搜索到 ${res.data.length} 条消息`);
+        }
+        resolve(res)
+      })
+    })
+  }
+
+  // 设置已发送的消息为已读
+  function setMessageStatusToRead (conversationType, targetId, channelId, sentTime) {
+    return RongIMLib.electronExtension.setMessageStatusToRead({
+      conversationType,
+      targetId,
+      channelId
+    }, sentTime)
+  }
+
+  // 设置消息的接受状态
+  function setMessageReceivedStatus (messageId, receivedStatus) {
+    return RongIMLib.electronExtension.setMessageReceivedStatus(messageId, receivedStatus)
+  }
+
+  // 设置消息的发送状态
+  function setMessageSentStatus (messageId, sentStatus) {
+    return RongIMLib.electronExtension.setMessageSentStatus(messageId, sentStatus)
+  }
+
+  // 修改消息内容
+  function setMessageContent (messageId, content, messageType) {
+    content = JSON.parse(content)
+    messageType = messageType === '' ? undefined : messageType
+    return RongIMLib.electronExtension.setMessageContent(messageId, content, messageType)
+  }
+
+  // 删除消息
+  function deleteMessages (messageIds) {
+    messageIds = messageIds.split(',') || []
+    return RongIMLib.electronExtension.deleteMessages(messageIds.map(i => Number(i)))
+  }
+
+  // 添加用户到黑名单
+  function addToBlacklist (userId) {
+    return RongIMLib.addToBlacklist(userId)
+  }
+
+  // 从黑名单中移除用户
+  function removeFromBlacklist (userId) {
+    return RongIMLib.removeFromBlacklist(userId)
+  }
+
+  // 获取黑名单列表
+  function getBlacklist () {
+    return RongIMLib.getBlacklist()
+  }
+
+  // 获取指定人员在黑名单中的状态
+  function getBlacklistStatus (userId) {
+    return RongIMLib.getBlacklistStatus(userId)
+  }
+
   win.RongIM = win.RongIM || {}
   win.RongIM.Service = {
-    init: init,
+    init, destroy,
     disconnect: disconnect,
     reconnect: reconnect,
     getServerTime: getServerTime,
@@ -1710,7 +2050,9 @@
     clearUnreadCount: clearUnreadCount,
     clearAllUnreadCount,
     getConversationUnreadCountByType: getConversationUnreadCountByType,
-    getAllConversationState,
+    // clearTotalUnreadCount: clearTotalUnreadCount,
+    getTotalUnreadMentionedCountByLevels,
+    getTotalUnreadCountByLevels,
 
     setDraft: setDraft,
     getDraft: getDraft,
@@ -1739,15 +2081,16 @@
 
     // setConversationStatus: setConversationStatus,
     setConversationNotificationStatus: setConversationNotificationStatus,
+    setConversationNotificationLevel,
     setConversationToTop: setConversationToTop,
     getTopConversationList: getTopConversationList,
     getBlockedConversationList: getBlockedConversationList,
+    getUnreadConversationList,
     setMessageKV,
     updateMessageExpansion,
     removeMessageExpansion,
 
     sendReadReceiptMessage,
-    getMessageReader,
     sendReadReceiptRequestMessage,
     sendReadReceiptResponseMessage,
     sendNewReadReceiptResponseMessage,
@@ -1775,17 +2118,42 @@
     getUltraGroupUnreadMentionedCountByTargetId,
     // 协议栈独有接口
     insertMessage,
+    insertBaseMessage,
+    batchInsertMessage,
     getMessage,
+    getMessageCount,
     getUnreadMentionedMessage,
-    searchMessageByContent,
     deleteLocalMessagesByTimestamp,
     clearMessages,
+    setCheckDuplicateMessage,
     searchConversationByContent,
     clearUnreadCountByTimestamp,
     getConversationNotificationStatus,
+    getConversationNotificationLevel,
+    setUltraGroupDefaultNotificationLevel,
+    getUltraGroupDefaultNotificationLevel,
+    getUltraGroupUnreadCountByTargetId,
+    getAllUltraGroupUnreadCount,
+    getAllUltraGroupUnreadMentionedCount,
     setMessageReceivedStatus,
     getUnreadMentionedCount,
-    getAllUnreadMentionedCount,
-    bindRTCRoomForChatroom
+    getUltraGroupUnreadMentionedMessages,
+    getUltraGroupFirstUnreadMessageTimestamp,
+
+    getAllConversationList,
+    getConversationListPC,
+    searchConversationByContent,
+    searchMessages,
+    searchMessageInTimeRange,
+    getHistoryMessagesByMessageTypes,
+    setMessageStatusToRead,
+    setMessageReceivedStatus,
+    setMessageSentStatus,
+    deleteMessages,
+    addToBlacklist,
+    removeFromBlacklist,
+    getBlacklist,
+    getBlacklistStatus,
+    setMessageContent,
   }
 })(window)

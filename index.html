@@ -9,23 +9,18 @@
   <title>Api Test V5</title>
   
   <link rel="stylesheet" href="./lib/styles/iview.css">
-  <!-- <link rel="stylesheet" href="./lib/styles/dragula-3.7.2.css"> -->
   <link rel="stylesheet" href="./styles/main.css">
   
-  <!-- <script src="//mstatic.secooimg.com/activity2018/js/sdk/weixin.sdk1.3.2.js"></script> -->
-  <!-- <script src="./lib/js/Sortable.min.js"></script> -->
   <script src="./lib/js/vue-2.6.10.js"></script>
   <script src="./lib/js/iview-4.0.2.min.js"></script>
   <script src="./lib/js/vue-json-pretty.js"></script>
   <script src="./lib/js/es6-promise.js"></script>
-  <!-- <script src="./lib/js/vuedraggable.umd.min.js"></script> -->
 
-  <script src="https://cdn.ronghub.com/RongIMLib-5.7.2.prod.js"></script>
+  <script src="./lib/js/RongIMLib-5.7.2.prod.js"></script>
   <script src="./config.js"></script>
   <script src="./js/common/utils.js"></script>
   <script src="./js/common/service.js"></script>
   <script src="./js/common/api-list.js"></script>
-
   
   <script id="rong-global-config" type="text/x-template">
     <div class="rong-login">
@@ -117,6 +112,7 @@
   <script src="./js/components/json-alert.js"></script>
   <script src="./js/components/msg-expansion.js"></script>
   <script src="./js/login.js"></script>
+  
 </head>
 <body>
   <div id="app" class="rong-box rong-hidden" :class="{ 'rong-drag': isDragging, 'rong-show': 1  }">
@@ -162,6 +158,7 @@
       </div>
       <div class="rong-user-title">
         <h4>当前用户 id： {{currentUserId}}</h4>
+        <i-button class="rong-runall-btn" size="small" @click="destroy">反初始化</i-button>
         <i-button class="rong-runall-btn" size="small" @click="isShowRunType=true">运行全部</i-button>
         <components class="rong-changeuser-btn" is="apiBtn"
           :api="getConnectionStatus" :isdragging="isDragging"></components>

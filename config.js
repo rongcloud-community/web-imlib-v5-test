@@ -5,10 +5,10 @@
     appkey: '',
     token: '',
     navi: '',
-    targetId: 'lzh',
+    targetId: '',
     customCMP: '',
     isPolling: false,
-    channelId: ''
+    channelId: '',
   }
 
   if (!isDebug) {

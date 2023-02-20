@@ -24,7 +24,7 @@
   var isStorageConfig = false
   if (StorageConfig && !isDebug) {
     isStorageConfig = true
-    Config = utils.copy(StorageConfig)
+    Config = utils.extend(Config, utils.copy(StorageConfig))
   }
   var urlQueryConfig = utils.getRCUrlQuery()
   Config = utils.extend(Config, urlQueryConfig)
@@ -132,25 +132,25 @@
   }
 
   function onConnecting() {
-    vueInstance.addOutput('监听链接', '正在链接', 0, [], {
-      color: utils.TypeColor.MSG
+    vueInstance.addOutput('正在链接', '正在链接', 0, [], {
+      color: utils.TypeColor.STATUS
     });
   }
 
   function onConnected() {
-    vueInstance.addOutput('监听链接', '已经链接', 0, [], {
-      color: utils.TypeColor.MSG
+    vueInstance.addOutput('已经链接', '已经链接', 0, [], {
+      color: utils.TypeColor.SUCCESS
     });
   }
 
-  function onDisconnect(status) {
-    vueInstance.addOutput('监听链接', '链接断开，'+'状态码 '+status, 0, [], {
+  function onDisconnect(code) {
+    vueInstance.addOutput('链接断开', `错误码: ${code}`, 0, [], {
       color: utils.TypeColor.FAILED
     });
   }
 
-  function onSuspend(status) {
-    vueInstance.addOutput('链接失败', '内部断开，尝试内部重新链接，'+'状态码 '+status, 0, [], {
+  function onSuspend(code) {
+    vueInstance.addOutput('内部断开，尝试内部重新链接', `错误码: ${code}`, 0, [], {
       color: utils.TypeColor.FAILED
     });
   }
@@ -288,6 +288,22 @@
     })
   }
 
+  function ultraGroupChannelUserKicked (list) {
+    vueInstance.addOutput('超级群私有道用户被踢', list, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+  function ultraGroupChannelTypeChange (list) {
+    vueInstance.addOutput('超级群频道类型改变', list, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+  function ultraGroupChannelDelete (list) {
+    vueInstance.addOutput('超级群频道删除', list, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
   function watchOperateStatus (status) {
     vueInstance.addOutput('超级群会话输入状态', status, 0, [], {
       color: utils.TypeColor.MSG
@@ -302,6 +318,18 @@
 
   function watchMessageBlocked (data) {
     vueInstance.addOutput('监听到敏感词回调', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchPrivateMessageDelivered (data) {
+    vueInstance.addOutput('监听到单聊消息送达', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchGroupMessageDelivered (data) {
+    vueInstance.addOutput('监听到群组消息送达状态变更', data, 0, [], {
       color: utils.TypeColor.MSG
     })
   }
@@ -331,8 +359,9 @@
     }
   }
 
-  function login (config) {
+  async function login (config) {
     setConfig(config)
+    await Service.destroy();
     return Service.init(config, {
       status: watchStatus,
       connection: {
@@ -356,19 +385,24 @@
       ultraGroupMessageExpansionUpdated: watchUltraGroupMessageExpansionUpdated,
       ultraGroupMessageModified: watchUltraGroupMessageModified,
       ultraGroupMessageRecalled: watchUltraGroupMessageRecalled,
+      ultraGroupChannelUserKicked: ultraGroupChannelUserKicked,
+      ultraGroupChannelTypeChange: ultraGroupChannelTypeChange,
+      ultraGroupChannelDelete: ultraGroupChannelDelete,
       conversation: watchConversation,
-      messageBlocked: watchMessageBlocked
+      messageBlocked: watchMessageBlocked,
+      privateMessageDelivered: watchPrivateMessageDelivered,
+      groupMessageDelivered: watchGroupMessageDelivered
     }).then(function (res) {
       if (res.code === 0 ) {
         Storage.set(Storage.ConfigKey, config)
         loginSuccessEvent(res.data.userId, config)
       } else {
-        console.log(error)
+        console.log(JSON.stringify(res))
         vueInstance.$Message.error({
           background: true,
-          content: '链接失败 ' + JSON.stringify(error)
+          content: '链接失败 ' + JSON.stringify(res)
         })
-        return utils.Defer.reject()
+        utils.Defer.reject()
       }
     }).catch(function (error) {
       console.log(error)
@@ -382,7 +416,7 @@
 
   function getApiListMethods () {
     return {
-      addOutput: function (title, result, consumedTime, params, config) {
+      addOutput(title, result, consumedTime, params, config) {
         config = config || {}
         var output = {
           id: utils.getIncreasNumber(),
@@ -444,6 +478,13 @@
         } else {
           return login(config)
         }
+      },
+      destroy () {
+        Service.destroy().then(() => {
+          vueInstance.clearOutput();
+          vueInstance.currentUserId = ''
+          vueInstance.isLogged = false
+        })
       },
       alarm: function () {
         if (!this.isAlarmMuted) {

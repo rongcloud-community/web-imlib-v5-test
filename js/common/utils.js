@@ -5,7 +5,8 @@
   var TypeColor = {
     FAILED: '#ed4014',
     MSG: '#2db7f5',
-    STATUS: '#ff9900'
+    STATUS: '#ff9900',
+    SUCCESS: '#28c22f'
   }
 
   var ConversationName = {
