@@ -3,7 +3,7 @@
 ## SDK 依赖
 
 ```html
-  <script src="https://cdn.ronghub.com/RongIMLib-5.7.2.prod.js"></script>
+  <script src="https://cdn.ronghub.com/RongIMLib-5.7.4.prod.js"></script>
 ```
 
 ## 使用说明
