@@ -3,7 +3,7 @@
 ## SDK 依赖
 
 ```html
-  <script src="https://cdn.ronghub.com/RongIMLib-5.7.4.prod.js"></script>
+  <script src="https://cdn.ronghub.com/RongIMLib-5.38.0.prod.js"></script>
 ```
 
 ## 使用说明
@@ -16,11 +16,11 @@
 
 ### AppKey 获取
 
-[可在融云开发者后台 - 服务管理](https://developer.rongcloud.cn/app/appService/8zkf1JD8NLF0gxOV3S0NuA)中创建一个应用，填入应用对应的 `appkey`
+[可在融云开发者后台 - 应用管理](https://console.rongcloud.cn/agile/apps/list) 中创建一个应用，填入应用对应的 `appkey`
 
 ### Token 获取
 
-[可在融云开发者后台 - 服务管理 - API 调用 - 获取 Token](https://developer.rongcloud.cn/apitool/bj4hYt7YBcwvXteZeVi7aQ) 中，输入 `userId`，从提交后返回的数据中取 `token` 字段值
+[可在融云开发者后台 - 北极星 - IM - Server API - 获取 Token](https://console.rongcloud.cn/agile/formwork/imServerApi/index) 中，输入 `userId`，从提交后返回的数据中取 `token` 字段值
 
 ## 私有云用户特殊配置
 
