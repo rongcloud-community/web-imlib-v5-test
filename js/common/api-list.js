@@ -1826,6 +1826,282 @@
     doc: 'https://doc.rongcloud.cn/im/Web/5.X/noui/user/blacklist'
   }
 
+  // ================================= 订阅在线状态 =============
+  var subscribeUserStatus = {
+    name: '订阅用户在线状态',
+    event: Service.subscribeUserStatus,
+    eventName: 'subscribeUserStatus',
+    desc: '订阅用户在线状态，单次最多 200 个，订阅类型 SubscribeType.ONLINE_STATUS 为 1',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/subscribe-online#subscribeUserStatus',
+    params: [
+      { name: '用户 Id(多个以英文逗号隔开)', type: 'string', value: config.targetId },
+      { name: '订阅类型(1:在线状态)', type: 'number', value: 1 },
+      { name: '订阅有效时间(秒 60~2592000)', type: 'number', value: 180000 }
+    ]
+  }
+
+  var unSubscribeUserStatus = {
+    name: '取消订阅用户在线状态',
+    event: Service.unSubscribeUserStatus,
+    eventName: 'unSubscribeUserStatus',
+    desc: '取消订阅用户在线状态，单次最多 200 个',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/subscribe-online#unSubscribeUserStatus',
+    params: [
+      { name: '用户 Id(多个以英文逗号隔开)', type: 'string', value: config.targetId },
+      { name: '订阅类型(1:在线状态)', type: 'number', value: 1 }
+    ]
+  }
+
+  var getSubscribeUserStatus = {
+    name: '查询订阅状态信息',
+    event: Service.getSubscribeUserStatus,
+    eventName: 'getSubscribeUserStatus',
+    desc: '查询指定用户和订阅类型的状态信息，一次最多 200 个',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/subscribe-online#getSubscribeUserStatus',
+    params: [
+      { name: '订阅类型(1:在线状态)', type: 'number', value: 1 },
+      { name: '用户 Id(多个以英文逗号隔开)', type: 'string', value: config.targetId }
+    ]
+  }
+
+  var getSubscribeUsersOnlineStatus = {
+    name: '查询订阅用户的在线状态',
+    event: Service.getSubscribeUsersOnlineStatus,
+    eventName: 'getSubscribeUsersOnlineStatus',
+    desc: '查询已订阅用户和好友用户的在线状态信息(5.28.0+)，长度 1~200',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/subscribe-online#getSubscribeUsersOnlineStatus',
+    params: [
+      { name: '用户 Id(多个以英文逗号隔开)', type: 'string', value: config.targetId }
+    ]
+  }
+
+  var getSubscribeUserList = {
+    name: '分页查询已订阅用户的状态信息',
+    event: Service.getSubscribeUserList,
+    eventName: 'getSubscribeUserList',
+    desc: '分页查询已订阅用户的状态信息，offset 首次为 0，后续为累计条数',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/subscribe-online#getSubscribeUserList',
+    params: [
+      { name: '订阅类型(1:在线状态)', type: 'number', value: 1 },
+      { name: '分页大小(1~200)', type: 'number', value: 20 },
+      { name: '分页偏移量', type: 'number', value: 0 }
+    ]
+  }
+
+  // ================================= 用户信息托管 =============
+  var updateMyUserProfile = {
+    name: '更新当前用户信息',
+    event: Service.updateMyUserProfile,
+    eventName: 'updateMyUserProfile',
+    desc: '更新当前用户信息，空字段不提交；性别/角色/级别为数字；扩展信息为 JSON 字符串',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/user-profiles#updateMyUserProfile',
+    params: [
+      { name: '昵称(<=32)', type: 'string', value: 'name' },
+      { name: '头像地址(<=128)', type: 'string', value: '' },
+      { name: 'Email(<=128)', type: 'string', value: '' },
+      { name: '生日(<=32)', type: 'string', value: '' },
+      { name: '性别', type: 'number', value: 1 },
+      { name: '所在地(<=32)', type: 'string', value: '' },
+      { name: '角色(0~100)', type: 'number', value: 1 },
+      { name: '级别(0~100)', type: 'number', value: 1 },
+      { name: '扩展信息(JSON)', type: 'string', value: '{"key1":"value1"}' }
+    ]
+  }
+
+  var getMyUserProfile = {
+    name: '获取当前用户信息',
+    event: Service.getMyUserProfile,
+    eventName: 'getMyUserProfile',
+    desc: '获取当前用户信息',
+    doc: 'https://docs.rongcloud.cn/web-imlib/user/user_profiles#getMyUserProfile',
+    params: []
+  }
+
+  var getUserProfiles = {
+    name: '批量获取他人用户信息',
+    event: Service.getUserProfiles,
+    eventName: 'getUserProfiles',
+    desc: '批量获取他人用户信息，一次最多 100 个',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/user-profiles#getUserProfiles',
+    params: [
+      { name: '用户 Id(多个以英文逗号隔开)', type: 'string', value: config.targetId }
+    ]
+  }
+
+  var updateMyUserProfileVisibility = {
+    name: '设置用户信息访问权限',
+    event: Service.updateMyUserProfileVisibility,
+    eventName: 'updateMyUserProfileVisibility',
+    desc: '设置当前用户信息访问权限 UserProfileVisibility：0 未设置，1 都不可见，2 所有人',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/user-profiles#updateMyUserProfileVisibility',
+    params: [
+      { name: '权限(0未设置,1都不可见,2所有人)', type: 'number', value: 2 }
+    ]
+  }
+
+  var getMyUserProfileVisibility = {
+    name: '获取用户信息访问权限',
+    event: Service.getMyUserProfileVisibility,
+    eventName: 'getMyUserProfileVisibility',
+    desc: '获取当前用户信息的访问权限',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/user-profiles#getMyUserProfileVisibility',
+    params: []
+  }
+
+  var searchUserProfileByUniqueId = {
+    name: '按应用号搜索用户信息',
+    event: Service.searchUserProfileByUniqueId,
+    eventName: 'searchUserProfileByUniqueId',
+    desc: '按用户应用号精确搜索用户信息',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/user-profiles#searchUserProfileByUniqueId',
+    params: [
+      { name: '用户应用号', type: 'string', value: '' }
+    ]
+  }
+
+  // ================================= 好友管理 =============
+  var addFriend = {
+    name: '添加好友',
+    event: Service.addFriend,
+    eventName: 'addFriend',
+    desc: '添加好友，DirectionType：2(双向好友)',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#addFriends',
+    params: [
+      { name: '目标用户 ID', type: 'string', value: config.targetId },
+      { name: '好友类型(2:双向)', type: 'number', value: 2 },
+      { name: '附加信息(<=128)', type: 'string', value: 'Hello, 加个好友' }
+    ]
+  }
+
+  var deleteFriends = {
+    name: '解除好友',
+    event: Service.deleteFriends,
+    eventName: 'deleteFriends',
+    desc: '批量解除好友关系，一次最多 100 个',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#deleteFriends',
+    params: [
+      { name: '用户 ID(多个以英文逗号隔开)', type: 'string', value: config.targetId },
+      { name: '好友类型(2:双向)', type: 'number', value: 2 }
+    ]
+  }
+
+  var setFriendInfo = {
+    name: '好友信息设置',
+    event: Service.setFriendInfo,
+    eventName: 'setFriendInfo',
+    desc: '设置好友备注名(<=64)和扩展信息(JSON，最多 10 个 key)，备注为空则清除',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#setFriendInfo',
+    params: [
+      { name: '好友用户 ID', type: 'string', value: config.targetId },
+      { name: '好友备注名(<=64)', type: 'string', value: 'Best Friend' },
+      { name: '扩展信息(JSON)', type: 'string', value: '' }
+    ]
+  }
+
+  var checkFriends = {
+    name: '检查好友关系',
+    event: Service.checkFriends,
+    eventName: 'checkFriends',
+    desc: '检查好友关系，一次最多 20 个(目前仅支持双向好友检查)',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#checkFriends',
+    params: [
+      { name: '用户 ID(多个以英文逗号隔开)', type: 'string', value: config.targetId },
+      { name: '好友类型(2:双向)', type: 'number', value: 2 }
+    ]
+  }
+
+  var setFriendAddPermission = {
+    name: '设置加好友权限',
+    event: Service.setFriendAddPermission,
+    eventName: 'setFriendAddPermission',
+    desc: '设置当前用户加好友权限 FriendAddPermission',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#setFriendAddPermission',
+    params: [
+      { name: '加好友权限', type: 'number', value: 0 }
+    ]
+  }
+
+  var getFriendAddPermission = {
+    name: '获取加好友权限',
+    event: Service.getFriendAddPermission,
+    eventName: 'getFriendAddPermission',
+    desc: '获取当前用户的加好友权限',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#getPermission',
+    params: []
+  }
+
+  var acceptFriendApplication = {
+    name: '同意加为好友',
+    event: Service.acceptFriendApplication,
+    eventName: 'acceptFriendApplication',
+    desc: '接受好友请求，双方收到 FRIEND_ADDED 事件',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#agree',
+    params: [
+      { name: '目标用户 ID', type: 'string', value: config.targetId }
+    ]
+  }
+
+  var refuseFriendApplication = {
+    name: '拒绝加为好友',
+    event: Service.refuseFriendApplication,
+    eventName: 'refuseFriendApplication',
+    desc: '拒绝好友请求，双方收到 FRIEND_APPLICATION_STATUS_CHANGED 事件',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#refuse',
+    params: [
+      { name: '目标用户 ID', type: 'string', value: config.targetId },
+      { name: '拒绝原因(<=128)', type: 'string', value: '' }
+    ]
+  }
+
+  var getFriendApplications = {
+    name: '分页获取好友请求列表',
+    event: Service.getFriendApplications,
+    eventName: 'getFriendApplications',
+    desc: '分页获取好友请求列表，默认 50 条，最大 100；有效期 7 天',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#getFriendRequestList',
+    params: [
+      { name: '数量(<=100)', type: 'number', value: 50 },
+      { name: 'pageToken', type: 'string', value: '' },
+      { name: '升序(order)', type: 'boolean', value: false }
+    ]
+  }
+
+  var getFriends = {
+    name: '获取好友列表',
+    event: Service.getFriends,
+    eventName: 'getFriends',
+    desc: '获取当前用户好友列表，QueryFriendsDirectionType：1/2 单向，3 双向；Web 分页默认 50 条',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#getFriends',
+    params: [
+      { name: '好友类型(2:双向)', type: 'number', value: 2 },
+      { name: '数量(<=100)', type: 'number', value: 50 },
+      { name: 'pageToken', type: 'string', value: '' },
+      { name: '升序(order)', type: 'boolean', value: false }
+    ]
+  }
+
+  var getFriendsInfo = {
+    name: '根据用户 ID 获取好友信息',
+    event: Service.getFriendsInfo,
+    eventName: 'getFriendsInfo',
+    desc: '根据用户 ID 获取好友信息，一次最多 100 个',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#getFriendInfoByUserId',
+    params: [
+      { name: '用户 ID(多个以英文逗号隔开)', type: 'string', value: config.targetId }
+    ]
+  }
+
+  var searchFriendsInfo = {
+    name: '根据好友昵称搜索好友信息(仅PC)',
+    event: Service.searchFriendsInfo,
+    eventName: 'searchFriendsInfo',
+    desc: '根据好友昵称/备注名搜索好友信息(仅 Electron 支持)，不超过 64 字符',
+    doc: 'https://doc.rongcloud.cn/im/imlib/web/friend-manager#searchFriendInfo',
+    params: [
+      { name: '用户昵称关键字(<=64)', type: 'string', value: '' }
+    ]
+  }
+
   win.RongIM = win.RongIM || {}
 
   var DefailtReadyApiQueue = [
@@ -1853,6 +2129,9 @@
     [searchMessages, searchMessages2, searchMessageInTimeRange, getHistoryMessagesByMessageTypes, setMessageStatusToRead, setMessageReceivedStatus, setMessageSentStatus,
       setMessageContent, deleteMessages],
     [addToBlacklist, removeFromBlacklist, getBlacklist, getBlacklistStatus],
+    [subscribeUserStatus, unSubscribeUserStatus, getSubscribeUserStatus, getSubscribeUsersOnlineStatus, getSubscribeUserList],
+    [updateMyUserProfile, getMyUserProfile, getUserProfiles, updateMyUserProfileVisibility, getMyUserProfileVisibility, searchUserProfileByUniqueId],
+    [addFriend, deleteFriends, setFriendInfo, checkFriends, setFriendAddPermission, getFriendAddPermission, acceptFriendApplication, refuseFriendApplication, getFriendApplications, getFriends, getFriendsInfo, searchFriendsInfo],
   ]
   urlQueryConfig.isMini && utils.forEach(DefailtReadyApiQueue, function (list, i) {
     utils.forEach(list, function (item, j) {

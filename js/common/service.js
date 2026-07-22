@@ -189,6 +189,56 @@
       console.warn('group message delivered', status)
       watcher.groupMessageDelivered(status)
     })
+
+    // ===== 订阅在线状态 / 用户信息托管 / 好友在线状态与资料变更 =====
+    // 被订阅者状态变更(需根据 subscribeType 区分在线状态 / 用户资料 / 好友)
+    Events.SUBSCRIBED_USER_STATUS_CHANGE && RongIMLib.addEventListener(Events.SUBSCRIBED_USER_STATUS_CHANGE, function (event) {
+      console.warn('subscribed user status change', event)
+      watcher.subscribedUserStatusChange && watcher.subscribedUserStatusChange(event)
+    })
+    // 订阅关系变更(多端同步)
+    Events.SUBSCRIBED_RELATION_CHANGE && RongIMLib.addEventListener(Events.SUBSCRIBED_RELATION_CHANGE, function (event) {
+      console.warn('subscribed relation change', event)
+      watcher.subscribedRelationChange && watcher.subscribedRelationChange(event)
+    })
+    // 订阅数据同步完成
+    Events.SYNC_SUBSCRIBED_USER_STATUS_FINISHED && RongIMLib.addEventListener(Events.SYNC_SUBSCRIBED_USER_STATUS_FINISHED, function (event) {
+      console.warn('sync subscribed user status finished', event)
+      watcher.syncSubscribedUserStatusFinished && watcher.syncSubscribedUserStatusFinished(event)
+    })
+    // 当前用户资料变更(多端同步)
+    Events.OWN_USER_PROFILE_CHANGED && RongIMLib.addEventListener(Events.OWN_USER_PROFILE_CHANGED, function (event) {
+      console.warn('own user profile changed', event)
+      watcher.ownUserProfileChanged && watcher.ownUserProfileChanged(event)
+    })
+
+    // ===== 好友事件监听 =====
+    // 添加好友
+    Events.FRIEND_ADDED && RongIMLib.addEventListener(Events.FRIEND_ADDED, function (data) {
+      console.warn('friend added', data)
+      watcher.friendAdded && watcher.friendAdded(data)
+    })
+    // 删除好友
+    Events.FRIEND_DELETE && RongIMLib.addEventListener(Events.FRIEND_DELETE, function (data) {
+      console.warn('friend delete', data)
+      watcher.friendDelete && watcher.friendDelete(data)
+    })
+    // 清空好友
+    Events.FRIEND_CLEARED && RongIMLib.addEventListener(Events.FRIEND_CLEARED, function (data) {
+      console.warn('friend cleared', data)
+      watcher.friendCleared && watcher.friendCleared(data)
+    })
+    // 好友申请状态变更
+    Events.FRIEND_APPLICATION_STATUS_CHANGED && RongIMLib.addEventListener(Events.FRIEND_APPLICATION_STATUS_CHANGED, function (data) {
+      console.warn('friend application status changed', data)
+      watcher.friendApplicationStatusChanged && watcher.friendApplicationStatusChanged(data)
+    })
+    // 好友信息变更多端同步
+    Events.FRIEND_INFO_CHANGED_SYNC && RongIMLib.addEventListener(Events.FRIEND_INFO_CHANGED_SYNC, function (data) {
+      console.warn('friend info changed sync', data)
+      watcher.friendInfoChangedSync && watcher.friendInfoChangedSync(data)
+    })
+
     if (!config.customCMP) {
       delete config.customCMP
     }
@@ -2005,6 +2055,253 @@
     return RongIMLib.getBlacklistStatus(userId)
   }
 
+  /**
+   * =========== 订阅在线状态 ============
+   * 文档: https://doc.rongcloud.cn/im/imlib/web/subscribe-online
+   */
+
+  // 将逗号分隔的字符串转为用户 ID 数组
+  function toUserIdList(userIds) {
+    if (Array.isArray(userIds)) {
+      return userIds
+    }
+    return (userIds || '').split(',').map(function (id) {
+      return id.trim()
+    }).filter(Boolean)
+  }
+
+  // 订阅类型, 缺省为在线状态订阅(SubscribeType.ONLINE_STATUS)
+  function toSubscribeType(type) {
+    if (utils.isEmpty(type)) {
+      return RongIMLib.SubscribeType ? RongIMLib.SubscribeType.ONLINE_STATUS : 1
+    }
+    return Number(type)
+  }
+
+  /**
+   * 订阅用户在线状态
+   * @param {string} userIds 用户 Id 集合, 多个以英文逗号隔开(1 ~ 200)
+   * @param {number} type 订阅类型 SubscribeType
+   * @param {number} expiry 订阅有效时间, 单位秒(60 ~ 2592000)
+   */
+  function subscribeUserStatus(userIds, type, expiry) {
+    return RongIMLib.subscribeUserStatus(toUserIdList(userIds), toSubscribeType(type), Number(expiry))
+  }
+
+  /**
+   * 取消订阅用户在线状态
+   */
+  function unSubscribeUserStatus(userIds, type) {
+    return RongIMLib.unSubscribeUserStatus(toUserIdList(userIds), toSubscribeType(type))
+  }
+
+  /**
+   * 查询订阅状态信息
+   */
+  function getSubscribeUserStatus(type, userIds) {
+    return RongIMLib.getSubscribeUserStatus(toSubscribeType(type), toUserIdList(userIds))
+  }
+
+  /**
+   * 查询订阅用户的在线状态(支持已订阅用户和好友用户, 5.28.0+)
+   */
+  function getSubscribeUsersOnlineStatus(userIds) {
+    return RongIMLib.getSubscribeUsersOnlineStatus(toUserIdList(userIds))
+  }
+
+  /**
+   * 分页查询已订阅用户的状态信息
+   */
+  function getSubscribeUserList(type, pageSize, offset) {
+    return RongIMLib.getSubscribeUserList(toSubscribeType(type), Number(pageSize), Number(offset))
+  }
+
+  /**
+   * =========== 用户信息托管 ============
+   * 文档: https://doc.rongcloud.cn/im/imlib/web/user-profiles
+   */
+
+  /**
+   * 更新当前用户信息
+   * 空字符串的字段不会被提交, 扩展信息需为 JSON 字符串
+   */
+  function updateMyUserProfile(name, portraitUri, email, birthday, gender, location, role, level, extProfile) {
+    var profile = {}
+    !utils.isEmpty(name) && (profile.name = name)
+    !utils.isEmpty(portraitUri) && (profile.portraitUri = portraitUri)
+    !utils.isEmpty(email) && (profile.email = email)
+    !utils.isEmpty(birthday) && (profile.birthday = birthday)
+    !utils.isEmpty(gender) && (profile.gender = Number(gender))
+    !utils.isEmpty(location) && (profile.location = location)
+    !utils.isEmpty(role) && (profile.role = Number(role))
+    !utils.isEmpty(level) && (profile.level = Number(level))
+    if (!utils.isEmpty(extProfile)) {
+      try {
+        profile.userExtProfile = JSON.parse(extProfile)
+      } catch (e) {
+        alert('扩展信息需为 JSON 字符串')
+        return utils.Defer.reject('扩展信息需为 JSON 字符串')
+      }
+    }
+    return RongIMLib.updateMyUserProfile(profile)
+  }
+
+  /**
+   * 获取当前用户信息
+   */
+  function getMyUserProfile() {
+    return RongIMLib.getMyUserProfile()
+  }
+
+  /**
+   * 批量获取他人用户信息, 一次最多 100 个
+   */
+  function getUserProfiles(userIds) {
+    return RongIMLib.getUserProfiles(toUserIdList(userIds))
+  }
+
+  /**
+   * 设置当前用户信息访问权限, visibility 为 UserProfileVisibility 枚举
+   */
+  function updateMyUserProfileVisibility(visibility) {
+    return RongIMLib.updateMyUserProfileVisibility(Number(visibility))
+  }
+
+  /**
+   * 获取当前用户信息访问权限
+   */
+  function getMyUserProfileVisibility() {
+    return RongIMLib.getMyUserProfileVisibility()
+  }
+
+  /**
+   * 按用户应用号精确搜索用户信息
+   */
+  function searchUserProfileByUniqueId(uniqueId) {
+    return RongIMLib.searchUserProfileByUniqueId(uniqueId)
+  }
+
+  /**
+   * =========== 好友管理 ============
+   * 文档: https://doc.rongcloud.cn/im/imlib/web/friend-manager
+   */
+
+  // 好友类型, 缺省为双向好友(DirectionType.BOTH)
+  function toDirectionType(type) {
+    if (utils.isEmpty(type)) {
+      return RongIMLib.DirectionType ? RongIMLib.DirectionType.BOTH : 3
+    }
+    return Number(type)
+  }
+
+  // 构造分页拉取参数 IPagingQueryOption
+  function buildPagingOption(count, pageToken, order) {
+    return {
+      count: Number(count) || 50,
+      pageToken: pageToken || '',
+      order: !!order
+    }
+  }
+
+  /**
+   * 添加好友
+   * @param {string} userId 目标用户 ID
+   * @param {number} directionType 好友类型 DirectionType
+   * @param {string} extra 附加信息, 不超过 128 个字符
+   */
+  function addFriend(userId, directionType, extra) {
+    return RongIMLib.addFriend(userId, toDirectionType(directionType), extra)
+  }
+
+  /**
+   * 解除好友, 一次最多 100 个
+   */
+  function deleteFriends(userIds, directionType) {
+    return RongIMLib.deleteFriends(toUserIdList(userIds), toDirectionType(directionType))
+  }
+
+  /**
+   * 好友信息设置(备注名 + 扩展信息)
+   * 扩展信息需为 JSON 字符串, 空时不提交
+   */
+  function setFriendInfo(userId, remark, extProfile) {
+    if (utils.isEmpty(extProfile)) {
+      return RongIMLib.setFriendInfo(userId, remark)
+    }
+    var ext
+    try {
+      ext = JSON.parse(extProfile)
+    } catch (e) {
+      alert('好友扩展信息需为 JSON 字符串')
+      return utils.Defer.reject('好友扩展信息需为 JSON 字符串')
+    }
+    return RongIMLib.setFriendInfo(userId, remark, ext)
+  }
+
+  /**
+   * 检查好友关系, 一次最多 20 个
+   */
+  function checkFriends(userIds, directionType) {
+    return RongIMLib.checkFriends(toUserIdList(userIds), toDirectionType(directionType))
+  }
+
+  /**
+   * 设置当前用户的加好友权限, permission 为 FriendAddPermission 枚举
+   */
+  function setFriendAddPermission(permission) {
+    return RongIMLib.setFriendAddPermission(Number(permission))
+  }
+
+  /**
+   * 获取当前用户的加好友权限
+   */
+  function getFriendAddPermission() {
+    return RongIMLib.getFriendAddPermission()
+  }
+
+  /**
+   * 同意加为好友
+   */
+  function acceptFriendApplication(userId) {
+    return RongIMLib.acceptFriendApplication(userId)
+  }
+
+  /**
+   * 拒绝加为好友
+   */
+  function refuseFriendApplication(userId, reason) {
+    return RongIMLib.refuseFriendApplication(userId, reason)
+  }
+
+  /**
+   * 分页获取好友请求列表(types / status 仅 Electron 支持, Web 传递无效)
+   */
+  function getFriendApplications(count, pageToken, order) {
+    return RongIMLib.getFriendApplications(buildPagingOption(count, pageToken, order))
+  }
+
+  /**
+   * 获取好友列表
+   * @param {number} directionType QueryFriendsDirectionType
+   */
+  function getFriends(directionType, count, pageToken, order) {
+    return RongIMLib.getFriends(toDirectionType(directionType), buildPagingOption(count, pageToken, order))
+  }
+
+  /**
+   * 根据用户 ID 获取好友信息, 一次最多 100 个
+   */
+  function getFriendsInfo(userIds) {
+    return RongIMLib.getFriendsInfo(toUserIdList(userIds))
+  }
+
+  /**
+   * 根据好友昵称搜索好友信息(仅 Electron 支持)
+   */
+  function searchFriendsInfo(name) {
+    return RongIMLib.searchFriendsInfo(name)
+  }
+
   win.RongIM = win.RongIM || {}
   win.RongIM.Service = {
     init, destroy,
@@ -2155,5 +2452,34 @@
     getBlacklist,
     getBlacklistStatus,
     setMessageContent,
+
+    // 订阅在线状态
+    subscribeUserStatus,
+    unSubscribeUserStatus,
+    getSubscribeUserStatus,
+    getSubscribeUsersOnlineStatus,
+    getSubscribeUserList,
+
+    // 用户信息托管
+    updateMyUserProfile,
+    getMyUserProfile,
+    getUserProfiles,
+    updateMyUserProfileVisibility,
+    getMyUserProfileVisibility,
+    searchUserProfileByUniqueId,
+
+    // 好友管理
+    addFriend,
+    deleteFriends,
+    setFriendInfo,
+    checkFriends,
+    setFriendAddPermission,
+    getFriendAddPermission,
+    acceptFriendApplication,
+    refuseFriendApplication,
+    getFriendApplications,
+    getFriends,
+    getFriendsInfo,
+    searchFriendsInfo,
   }
 })(window)

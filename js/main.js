@@ -334,6 +334,62 @@
     })
   }
 
+  // ===== 订阅在线状态 / 用户信息托管 =====
+  function watchSubscribedUserStatusChange (event) {
+    vueInstance.addOutput('监听到被订阅者状态变更(subscribeType 区分类型)', event, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchSubscribedRelationChange (event) {
+    vueInstance.addOutput('监听到订阅关系变更(多端同步)', event, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchSyncSubscribedUserStatusFinished (event) {
+    vueInstance.addOutput('监听到订阅数据同步完成', event, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchOwnUserProfileChanged (event) {
+    vueInstance.addOutput('监听到当前用户资料变更', event, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  // ===== 好友事件 =====
+  function watchFriendAdded (data) {
+    vueInstance.addOutput('监听到添加好友', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchFriendDelete (data) {
+    vueInstance.addOutput('监听到删除好友', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchFriendCleared (data) {
+    vueInstance.addOutput('监听到清空全部好友', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchFriendApplicationStatusChanged (data) {
+    vueInstance.addOutput('监听到好友申请状态变更', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
+  function watchFriendInfoChangedSync (data) {
+    vueInstance.addOutput('监听到好友信息变更(多端同步)', data, 0, [], {
+      color: utils.TypeColor.MSG
+    })
+  }
+
   function autoRun () {
     Vue.nextTick(function () {
       runOneByOne(function () {
@@ -391,7 +447,16 @@
       conversation: watchConversation,
       messageBlocked: watchMessageBlocked,
       privateMessageDelivered: watchPrivateMessageDelivered,
-      groupMessageDelivered: watchGroupMessageDelivered
+      groupMessageDelivered: watchGroupMessageDelivered,
+      subscribedUserStatusChange: watchSubscribedUserStatusChange,
+      subscribedRelationChange: watchSubscribedRelationChange,
+      syncSubscribedUserStatusFinished: watchSyncSubscribedUserStatusFinished,
+      ownUserProfileChanged: watchOwnUserProfileChanged,
+      friendAdded: watchFriendAdded,
+      friendDelete: watchFriendDelete,
+      friendCleared: watchFriendCleared,
+      friendApplicationStatusChanged: watchFriendApplicationStatusChanged,
+      friendInfoChangedSync: watchFriendInfoChangedSync
     }).then(function (res) {
       if (res.code === 0 ) {
         Storage.set(Storage.ConfigKey, config)
